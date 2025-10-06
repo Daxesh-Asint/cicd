@@ -83,6 +83,9 @@ substitutions:
   _SERVICE_NAME: 'cicd-demo-app'
   _REGION: 'us-central1'
 
+# Build timeout (maximum 24 hours)
+timeout: '1200s'
+
 # Build options
 options:
   # Use higher CPU for faster builds
@@ -93,9 +96,6 @@ options:
   
   # Logging options
   logging: CLOUD_LOGGING_ONLY
-  
-  # Build timeout (maximum 24 hours)
-  timeout: '1200s'
 
 # Images to be pushed to Container Registry
 images:
