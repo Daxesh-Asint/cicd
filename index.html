@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GitHub to Google Cloud Run CI/CD Pipeline</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 40px;
+        }
+
+        .header h1 {
+            font-size: 3em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .header p {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+
+        .workflow-container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            padding: 40px;
+            margin-bottom: 30px;
+        }
+
+        .workflow-steps {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 30px;
+            margin-bottom: 40px;
+        }
+
+        .step {
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 25px;
+            text-align: center;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+            border-left: 5px solid #4285f4;
+        }
+
+        .step:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+        }
+
+        .step-number {
+            background: #4285f4;
+            color: white;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            margin: 0 auto 15px;
+        }
+
+        .step h3 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 1.3em;
+        }
+
+        .step p {
+            color: #666;
+            line-height: 1.5;
+        }
+
+        .flow-diagram {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-wrap: wrap;
+            margin: 40px 0;
+            gap: 20px;
+        }
+
+        .flow-item {
+            background: #e3f2fd;
+            border: 2px solid #2196f3;
+            border-radius: 10px;
+            padding: 15px 20px;
+            text-align: center;
+            font-weight: bold;
+            color: #1976d2;
+            min-width: 120px;
+        }
+
+        .arrow {
+            font-size: 2em;
+            color: #4285f4;
+            font-weight: bold;
+        }
+
+        .files-section {
+            background: #fff3e0;
+            border-radius: 15px;
+            padding: 30px;
+            margin-top: 30px;
+        }
+
+        .files-section h2 {
+            color: #e65100;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .file-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+        }
+
+        .file-item {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            border-left: 4px solid #ff9800;
+        }
+
+        .file-item h4 {
+            color: #e65100;
+            margin-bottom: 10px;
+        }
+
+        .file-item .file-path {
+            font-family: 'Courier New', monospace;
+            background: #f5f5f5;
+            padding: 5px 10px;
+            border-radius: 5px;
+            font-size: 0.9em;
+            margin-bottom: 10px;
+        }
+
+        .benefits {
+            background: #e8f5e8;
+            border-radius: 15px;
+            padding: 30px;
+            margin-top: 30px;
+        }
+
+        .benefits h2 {
+            color: #2e7d32;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .benefits-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+        }
+
+        .benefit-item {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            text-align: center;
+            border-left: 4px solid #4caf50;
+        }
+
+        .benefit-item h4 {
+            color: #2e7d32;
+            margin-bottom: 10px;
+        }
+
+        .setup-steps {
+            background: #fce4ec;
+            border-radius: 15px;
+            padding: 30px;
+            margin-top: 30px;
+        }
+
+        .setup-steps h2 {
+            color: #c2185b;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .setup-list {
+            list-style: none;
+            counter-reset: setup-counter;
+        }
+
+        .setup-list li {
+            counter-increment: setup-counter;
+            background: white;
+            margin-bottom: 15px;
+            padding: 20px;
+            border-radius: 10px;
+            border-left: 4px solid #e91e63;
+            position: relative;
+        }
+
+        .setup-list li::before {
+            content: counter(setup-counter);
+            background: #e91e63;
+            color: white;
+            width: 25px;
+            height: 25px;
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            margin-right: 15px;
+            font-size: 0.9em;
+        }
+
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 2em;
+            }
+            
+            .workflow-steps {
+                grid-template-columns: 1fr;
+            }
+            
+            .flow-diagram {
+                flex-direction: column;
+            }
+            
+            .arrow {
+                transform: rotate(90deg);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚀 CI/CD Pipeline</h1>
+            <p>GitHub → Google Cloud Build → Cloud Run</p>
+        </div>
+
+        <div class="workflow-container">
+            <h2 style="text-align: center; margin-bottom: 30px; color: #333;">Complete CI/CD Workflow</h2>
+            
+            <div class="flow-diagram">
+                <div class="flow-item">📝 Code Push</div>
+                <div class="arrow">→</div>
+                <div class="flow-item">🐙 GitHub</div>
+                <div class="arrow">→</div>
+                <div class="flow-item">🔨 Cloud Build</div>
+                <div class="arrow">→</div>
+                <div class="flow-item">🐳 Container Registry</div>
+                <div class="arrow">→</div>
+                <div class="flow-item">☁️ Cloud Run</div>
+            </div>
+
+            <div class="workflow-steps">
+                <div class="step">
+                    <div class="step-number">1</div>
+                    <h3>🔗 Connect Repository</h3>
+                    <p>Link your GitHub repository to Google Cloud Build using Cloud Build triggers. This establishes the connection between your source code and the deployment pipeline.</p>
+                </div>
+
+                <div class="step">
+                    <div class="step-number">2</div>
+                    <h3>⚡ Automatic Trigger</h3>
+                    <p>Set up triggers to automatically start the build process whenever you push changes to specific branches (main, develop, etc.).</p>
+                </div>
+
+                <div class="step">
+                    <div class="step-number">3</div>
+                    <h3>🏗️ Build & Test</h3>
+                    <p>Cloud Build executes your build steps, runs tests, and creates a Docker container image from your application code.</p>
+                </div>
+
+                <div class="step">
+                    <div class="step-number">4</div>
+                    <h3>📦 Container Registry</h3>
+                    <p>The built container image is pushed to Google Container Registry (GCR) or Artifact Registry for secure storage.</p>
+                </div>
+
+                <div class="step">
+                    <div class="step-number">5</div>
+                    <h3>🚀 Deploy to Cloud Run</h3>
+                    <p>The new container image is automatically deployed to Cloud Run, making your updated application live and accessible.</p>
+                </div>
+
+                <div class="step">
+                    <div class="step-number">6</div>
+                    <h3>✅ Health Check</h3>
+                    <p>Cloud Run performs health checks and ensures the new deployment is running correctly before routing traffic to it.</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="files-section">
+            <h2>📁 Required Files in Your Repository</h2>
+            <div class="file-list">
+                <div class="file-item">
+                    <h4>Dockerfile</h4>
+                    <div class="file-path">./Dockerfile</div>
+                    <p><strong>Essential:</strong> Defines how to containerize your application. Specifies the base image, dependencies, and startup commands.</p>
+                </div>
+
+                <div class="file-item">
+                    <h4>Cloud Build Configuration</h4>
+                    <div class="file-path">./cloudbuild.yaml</div>
+                    <p><strong>Required:</strong> Defines the CI/CD pipeline steps including build, test, and deployment to Cloud Run.</p>
+                </div>
+
+                <div class="file-item">
+                    <h4>Application Code</h4>
+                    <div class="file-path">./src/* or ./app/*</div>
+                    <p><strong>Core:</strong> Your main application files (HTML, CSS, JS, Python, Node.js, etc.)</p>
+                </div>
+
+                <div class="file-item">
+                    <h4>Dependencies File</h4>
+                    <div class="file-path">./package.json, ./requirements.txt, ./pom.xml</div>
+                    <p><strong>Important:</strong> Language-specific dependency definitions for your application.</p>
+                </div>
+
+                <div class="file-item">
+                    <h4>Environment Configuration</h4>
+                    <div class="file-path">./.env.example</div>
+                    <p><strong>Optional:</strong> Template for environment variables (never commit actual .env files).</p>
+                </div>
+
+                <div class="file-item">
+                    <h4>Documentation</h4>
+                    <div class="file-path">./README.md</div>
+                    <p><strong>Recommended:</strong> Project documentation, setup instructions, and deployment guide.</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="benefits">
+            <h2>🎯 Benefits of This CI/CD Pipeline</h2>
+            <div class="benefits-grid">
+                <div class="benefit-item">
+                    <h4>⚡ Automated Deployment</h4>
+                    <p>No manual deployment steps. Push code and it's live automatically.</p>
+                </div>
+                <div class="benefit-item">
+                    <h4>🔄 Consistent Process</h4>
+                    <p>Same deployment process every time, reducing human error.</p>
+                </div>
+                <div class="benefit-item">
+                    <h4>🚀 Fast Feedback</h4>
+                    <p>Quick identification of issues through automated testing.</p>
+                </div>
+                <div class="benefit-item">
+                    <h4>📈 Scalability</h4>
+                    <p>Cloud Run automatically scales your application based on traffic.</p>
+                </div>
+                <div class="benefit-item">
+                    <h4>💰 Cost Effective</h4>
+                    <p>Pay only for actual usage with Cloud Run's serverless model.</p>
+                </div>
+                <div class="benefit-item">
+                    <h4>🔒 Secure</h4>
+                    <p>Built-in security with Google Cloud's infrastructure.</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="setup-steps">
+            <h2>🛠️ Setup Steps</h2>
+            <ol class="setup-list">
+                <li><strong>Create Google Cloud Project:</strong> Set up a new project in Google Cloud Console and enable Cloud Build and Cloud Run APIs.</li>
+                <li><strong>Connect GitHub Repository:</strong> In Cloud Build, create a trigger and connect your GitHub repository.</li>
+                <li><strong>Configure Build Trigger:</strong> Set up trigger conditions (branch, file patterns) and specify the cloudbuild.yaml file location.</li>
+                <li><strong>Add Required Files:</strong> Ensure your repository contains Dockerfile and cloudbuild.yaml with proper configurations.</li>
+                <li><strong>Set IAM Permissions:</strong> Grant Cloud Build service account necessary permissions for Cloud Run deployment.</li>
+                <li><strong>Test the Pipeline:</strong> Push a change to your repository and verify the automatic deployment works.</li>
+                <li><strong>Monitor & Optimize:</strong> Use Cloud Console to monitor builds, deployments, and application performance.</li>
+            </ol>
+        </div>
+    </div>
+</body>
+</html>

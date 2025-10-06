@@ -1,0 +1,110 @@
+# Cloud Build Configuration for GitHub to Cloud Run CI/CD
+# This file defines the automated build and deployment pipeline
+
+steps:
+  # Step 1: Build the Docker image
+  - name: 'gcr.io/cloud-builders/docker'
+    args: 
+      - 'build'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/${_SERVICE_NAME}:$COMMIT_SHA'
+      - '-t'
+      - 'gcr.io/$PROJECT_ID/${_SERVICE_NAME}:latest'
+      - '.'
+    id: 'build-image'
+
+  # Step 2: Push the Docker image to Container Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - 'gcr.io/$PROJECT_ID/${_SERVICE_NAME}:$COMMIT_SHA'
+    id: 'push-image'
+    waitFor: ['build-image']
+
+  # Step 3: Push the latest tag to Container Registry
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - 'gcr.io/$PROJECT_ID/${_SERVICE_NAME}:latest'
+    id: 'push-latest'
+    waitFor: ['build-image']
+
+  # Step 4: Deploy to Cloud Run
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: 'gcloud'
+    args:
+      - 'run'
+      - 'deploy'
+      - '${_SERVICE_NAME}'
+      - '--image'
+      - 'gcr.io/$PROJECT_ID/${_SERVICE_NAME}:$COMMIT_SHA'
+      - '--region'
+      - '${_REGION}'
+      - '--platform'
+      - 'managed'
+      - '--allow-unauthenticated'
+      - '--port'
+      - '8080'
+      - '--memory'
+      - '512Mi'
+      - '--cpu'
+      - '1'
+      - '--max-instances'
+      - '10'
+      - '--timeout'
+      - '300'
+      - '--set-env-vars'
+      - 'NODE_ENV=production'
+    id: 'deploy-cloud-run'
+    waitFor: ['push-image']
+
+  # Step 5: Verify deployment (optional health check)
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        # Get the service URL
+        SERVICE_URL=$(gcloud run services describe ${_SERVICE_NAME} --region=${_REGION} --format='value(status.url)')
+        echo "Service deployed at: $$SERVICE_URL"
+        
+        # Basic health check
+        if curl -f -s "$$SERVICE_URL" > /dev/null; then
+          echo "✅ Deployment successful! Service is responding."
+        else
+          echo "❌ Deployment verification failed!"
+          exit 1
+        fi
+    id: 'verify-deployment'
+    waitFor: ['deploy-cloud-run']
+
+# Substitution variables (can be set in Cloud Build trigger)
+substitutions:
+  _SERVICE_NAME: 'cicd-demo-app'
+  _REGION: 'us-central1'
+
+# Build options
+options:
+  # Use higher CPU for faster builds
+  machineType: 'E2_HIGHCPU_8'
+  
+  # Disk size
+  diskSizeGb: '100'
+  
+  # Logging options
+  logging: CLOUD_LOGGING_ONLY
+  
+  # Build timeout (maximum 24 hours)
+  timeout: '1200s'
+
+# Images to be pushed to Container Registry
+images:
+  - 'gcr.io/$PROJECT_ID/${_SERVICE_NAME}:$COMMIT_SHA'
+  - 'gcr.io/$PROJECT_ID/${_SERVICE_NAME}:latest'
+
+# Tags for better organization
+tags:
+  - 'cicd'
+  - 'github'
+  - 'cloud-run'
+  - '${_SERVICE_NAME}'

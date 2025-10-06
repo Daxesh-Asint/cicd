@@ -1,0 +1,132 @@
+# Alternative CI/CD using GitHub Actions
+# This workflow provides an alternative to Cloud Build triggers
+
+name: Deploy to Google Cloud Run
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+env:
+  PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+  SERVICE_NAME: cicd-demo-app
+  REGION: us-central1
+  GAR_LOCATION: us-central1
+  REPOSITORY: cicd-demo-repo
+
+jobs:
+  deploy:
+    # Only run deployment on main/master branch pushes
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+    
+    runs-on: ubuntu-latest
+    
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Authenticate to Google Cloud using Workload Identity
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ env.PROJECT_ID }}
+
+      - name: Configure Docker to use gcloud as a credential helper
+        run: |
+          gcloud auth configure-docker
+
+      - name: Build Docker image
+        run: |
+          docker build -t gcr.io/${{ env.PROJECT_ID }}/${{ env.SERVICE_NAME }}:${{ github.sha }} .
+          docker build -t gcr.io/${{ env.PROJECT_ID }}/${{ env.SERVICE_NAME }}:latest .
+
+      - name: Push Docker image to Container Registry
+        run: |
+          docker push gcr.io/${{ env.PROJECT_ID }}/${{ env.SERVICE_NAME }}:${{ github.sha }}
+          docker push gcr.io/${{ env.PROJECT_ID }}/${{ env.SERVICE_NAME }}:latest
+
+      - name: Deploy to Cloud Run
+        run: |
+          gcloud run deploy ${{ env.SERVICE_NAME }} \
+            --image gcr.io/${{ env.PROJECT_ID }}/${{ env.SERVICE_NAME }}:${{ github.sha }} \
+            --region ${{ env.REGION }} \
+            --platform managed \
+            --allow-unauthenticated \
+            --port 8080 \
+            --memory 512Mi \
+            --cpu 1 \
+            --max-instances 10 \
+            --timeout 300 \
+            --set-env-vars NODE_ENV=production
+
+      - name: Get service URL
+        run: |
+          SERVICE_URL=$(gcloud run services describe ${{ env.SERVICE_NAME }} --region=${{ env.REGION }} --format='value(status.url)')
+          echo "Service URL: $SERVICE_URL"
+          echo "SERVICE_URL=$SERVICE_URL" >> $GITHUB_ENV
+
+      - name: Verify deployment
+        run: |
+          if curl -f -s "${{ env.SERVICE_URL }}" > /dev/null; then
+            echo "✅ Deployment successful! Service is responding at ${{ env.SERVICE_URL }}"
+          else
+            echo "❌ Deployment verification failed!"
+            exit 1
+          fi
+
+  # Job for running tests on pull requests
+  test:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build Docker image for testing
+        run: |
+          docker build -t test-image .
+
+      - name: Run basic tests
+        run: |
+          # Start container in background
+          docker run -d -p 8080:8080 --name test-container test-image
+          
+          # Wait for container to start
+          sleep 10
+          
+          # Basic health check
+          if curl -f -s "http://localhost:8080" > /dev/null; then
+            echo "✅ Basic health check passed"
+          else
+            echo "❌ Basic health check failed"
+            docker logs test-container
+            exit 1
+          fi
+          
+          # Cleanup
+          docker stop test-container
+          docker rm test-container
+
+      - name: Comment PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: '✅ Tests passed! Ready for deployment once merged to main.'
+            })
